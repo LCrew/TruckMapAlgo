@@ -1,0 +1,14 @@
+fastapi==0.115.*
+uvicorn[standard]==0.32.*
+sqlmodel==0.0.22
+httpx==0.28.*
+beautifulsoup4==4.12.*
+lxml==5.3.*
+ortools==9.12.*
+scikit-learn==1.6.*
+numpy==2.2.*
+pandas==2.2.*
+joblib==1.4.*
+apscheduler==3.11.*
+python-multipart==0.0.*
+pytest==8.3.*

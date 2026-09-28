@@ -1,0 +1,6 @@
+reference,customer,pickup_address,delivery_address,ldm,volume_m3,weight_kg,pallets,hazmat
+ORD-101,Rimi Logistics,,"Krasta iela 101, Rīga",4.8,30,7000,12,no
+ORD-102,Jelgavas Būve,,"Rūpniecības iela 2, Jelgava",2.4,12,5500,6,no
+ORD-103,Kauno Prekyba,,"Pramonės pr. 16, Kaunas",3.2,20,6000,8,no
+ORD-104,Tartu Ehitus,,"Turu 45, Tartu",2.0,25,3000,5,yes
+ORD-105,Liepājas Metāls,"Brīvības iela 93, Liepāja","Rūpniecības iela 2, Jelgava",6.0,40,12000,16,no

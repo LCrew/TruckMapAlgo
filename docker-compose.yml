@@ -1,0 +1,49 @@
+services:
+  valhalla:
+    image: ghcr.io/valhalla/valhalla-scripted:latest
+    container_name: truckmap-valhalla
+    ports:
+      - "127.0.0.1:8002:8002"  # internal: only reachable from this machine
+    volumes:
+      - ./valhalla/custom_files:/custom_files
+    environment:
+      # Tiles are built from custom_files/baltics.osm.pbf, created by valhalla/scripts/fetch_osm.sh
+      # (LV + LT + EE extracts merged with osmium).
+      - use_tiles_ignore_pbf=True
+      - force_rebuild=False
+      - build_elevation=False
+      - build_admins=True        # needed for per-country km (tolls) and country access rules
+      - build_time_zones=True
+      - build_transit=False
+      - server_threads=4
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    container_name: truckmap-backend
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-8000}:8000"  # internal: the web app reaches it through nginx
+    environment:
+      - VALHALLA_URL=http://valhalla:8002
+      - DATABASE_URL=sqlite:////data/truckmap.db
+      - DATA_DIR=/data
+      - RESTRICTIONS_FILE=/restrictions/restrictions.geojsonseq
+    env_file:
+      # optional: GITHUB_TOKEN / GITHUB_REPO for the in-app "Report an issue" button (see .env.example)
+      - path: .env
+        required: false
+    volumes:
+      - ./backend/data:/data
+      - ./valhalla/restrictions:/restrictions:ro
+    depends_on:
+      - valhalla
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: truckmap-frontend
+    ports:
+      - "${APP_PORT:-5173}:80"  # the web app; set APP_PORT in .env (e.g. 8081)
+    depends_on:
+      - backend
+    restart: unless-stopped
