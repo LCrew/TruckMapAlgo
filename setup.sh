@@ -17,3 +17,4 @@ docker compose up -d --build
 
 echo
 echo "Baltic Truck Planner is running: http://$(hostname -I 2>/dev/null | awk '{print $1}' || echo localhost):${APP_PORT:-5173}"
+echo "Next time, start it with: ./start.sh"

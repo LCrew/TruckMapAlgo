@@ -44,7 +44,8 @@ Useful commands:
 | Task | Command |
 |---|---|
 | Status / logs | `docker compose ps` · `docker compose logs -f backend` |
-| Stop / start | `docker compose down` · `docker compose up -d` |
+| **Start** (after setup, e.g. after `docker compose down`) | `./start.sh` |
+| Stop | `docker compose down` |
 | Update the app | `git pull && docker compose up -d --build` |
 | Refresh road data (e.g. weekly) | `./valhalla/scripts/fetch_osm.sh && ./valhalla/scripts/rebuild_tiles.sh` |
 | Back up data | copy `backend/data/truckmap.db` |
