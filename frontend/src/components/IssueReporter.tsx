@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { useI18n } from "../lib/i18n";
+import Icon from "./Icon";
+import { Field, Seg, Spinner, Toggle, Window } from "./ui";
 
 type Kind = "bug" | "idea" | "question";
 
@@ -20,10 +22,7 @@ export default function IssueReporter({ page, onClose }: { page: string; onClose
 
   useEffect(() => {
     api.issueConfig().then(setConfig).catch(() => setConfig(null));
-    const esc = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", esc);
-    return () => window.removeEventListener("keydown", esc);
-  }, [onClose]);
+  }, []);
 
   const context = (): Record<string, string> =>
     withContext
@@ -45,6 +44,7 @@ export default function IssueReporter({ page, onClose }: { page: string; onClose
   };
 
   const valid = title.trim().length >= 3 && description.trim().length >= 10;
+  const fallback = !!config && !config.enabled;
 
   const submit = async () => {
     setBusy(true);
@@ -58,55 +58,52 @@ export default function IssueReporter({ page, onClose }: { page: string; onClose
     }
   };
 
-  return (
-    <div className="modal-backdrop" onMouseDown={onClose}>
-      <div className="modal card" role="dialog" aria-modal="true" aria-labelledby="issue-title" onMouseDown={(e) => e.stopPropagation()}>
-        <div className="spread">
-          <h2 id="issue-title">{t("reportIssue")}</h2>
-          <button className="btn ghost" onClick={onClose}>{t("close")}</button>
-        </div>
+  const actions = created ? (
+    <button className="btn primary" onClick={onClose}>{t("done")}</button>
+  ) : (
+    <>
+      <button className="btn" onClick={onClose}>{t("cancel")}</button>
+      {fallback ? (
+        <a className={`btn primary ${valid ? "" : "disabled"}`} href={githubFallbackUrl()} target="_blank" rel="noreferrer"
+          aria-disabled={!valid} onClick={(e) => !valid && e.preventDefault()} style={valid ? undefined : { opacity: .45, pointerEvents: "none" }}>
+          <Icon name="external" size={18} />{t("openOnGithub")}
+        </a>
+      ) : (
+        <button className="btn primary" disabled={!valid || busy} onClick={submit}>
+          {busy ? <Spinner /> : <Icon name="flag" size={18} />}{busy ? t("sending") : t("send")}
+        </button>
+      )}
+    </>
+  );
 
-        {created ? (
-          <div className="alert">
-            {created.number ? t("issueCreated", { n: created.number }) : t("issueCreated", { n: "" })}{" "}
+  return (
+    <Window title={t("reportIssue")} onClose={onClose} actions={actions} width={560}>
+      {created ? (
+        <div className="alert ok">
+          <Icon name="check" size={18} />
+          <span>
+            {t("issueCreated", { n: created.number ?? "" })}{" "}
             <a href={created.url} target="_blank" rel="noreferrer">{t("viewOnGithub")}</a>
-          </div>
-        ) : (
-          <>
-            <label className="field">{t("issueKind")}
-              <select value={kind} onChange={(e) => setKind(e.target.value as Kind)}>
-                <option value="bug">{t("kindBug")}</option>
-                <option value="idea">{t("kindIdea")}</option>
-                <option value="question">{t("kindQuestion")}</option>
-              </select>
-            </label>
-            <label className="field">{t("issueTitle")}
-              <input value={title} maxLength={120} placeholder={t("issueTitlePh")} onChange={(e) => setTitle(e.target.value)} autoFocus />
-            </label>
-            <label className="field">{t("issueDesc")}
-              <textarea rows={6} value={description} maxLength={6000} placeholder={t("issueDescPh")}
-                onChange={(e) => setDescription(e.target.value)} />
-            </label>
-            {/* honeypot: hidden from people, bots tend to fill every field */}
-            <input className="hp" tabIndex={-1} autoComplete="off" value={website} onChange={(e) => setWebsite(e.target.value)} aria-hidden="true" />
-            <label className="row small"><input type="checkbox" checked={withContext} onChange={(e) => setWithContext(e.target.checked)} /> {t("includeContext")}</label>
-            <div className="alert small">{t("publicWarning")}</div>
-            {error && <div className="alert error small">{error}</div>}
-            {config && !config.enabled ? (
-              <div className="small">
-                {t("notConfiguredFallback")}{" "}
-                <a className="btn primary" href={githubFallbackUrl()} target="_blank" rel="noreferrer"
-                  aria-disabled={!valid} onClick={(e) => !valid && e.preventDefault()}>{t("openOnGithub")}</a>
-              </div>
-            ) : (
-              <div className="row">
-                <button className="btn primary" disabled={!valid || busy} onClick={submit}>{busy ? t("sending") : t("send")}</button>
-                <button className="btn" onClick={onClose}>{t("cancel")}</button>
-              </div>
-            )}
-          </>
-        )}
-      </div>
-    </div>
+          </span>
+        </div>
+      ) : (
+        <div className="stack">
+          <Seg full value={kind} onChange={setKind} label={t("issueKind")}
+            options={[{ value: "bug", label: t("kindBug") }, { value: "idea", label: t("kindIdea") }, { value: "question", label: t("kindQuestion") }]} />
+          <Field label={t("issueTitle")}>
+            <input value={title} maxLength={120} placeholder={t("issueTitlePh")} onChange={(e) => setTitle(e.target.value)} />
+          </Field>
+          <Field label={t("issueDesc")}>
+            <textarea rows={6} value={description} maxLength={6000} placeholder={t("issueDescPh")} onChange={(e) => setDescription(e.target.value)} />
+          </Field>
+          {/* honeypot: hidden from people, bots tend to fill every field */}
+          <input className="hp" tabIndex={-1} autoComplete="off" value={website} onChange={(e) => setWebsite(e.target.value)} aria-hidden="true" />
+          <Toggle small checked={withContext} onChange={setWithContext}><span className="small">{t("includeContext")}</span></Toggle>
+          <div className="alert info"><Icon name="info" size={18} /><span className="small">{t("publicWarning")}</span></div>
+          {fallback && <p className="small muted" style={{ margin: 0 }}>{t("notConfiguredFallback")}</p>}
+          {error && <div className="alert error"><Icon name="alert" size={18} /><span>{error}</span></div>}
+        </div>
+      )}
+    </Window>
   );
 }

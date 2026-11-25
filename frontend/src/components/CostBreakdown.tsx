@@ -1,131 +1,123 @@
-import { eur, hours, num, PlanResult, Prediction } from "../lib/api";
+import { eur, hours, num, PlanResult } from "../lib/api";
 import { Key, useI18n } from "../lib/i18n";
+import Icon from "./Icon";
 
-const COLORS: Record<string, string> = {
-  fuel: "#f2a900",
-  driver: "#1f6feb",
-  tolls: "#8250df",
-  wear: "#6e7781",
-  fixed: "#2da44e",
-  margin: "#bf3989",
+export const COST_COLORS: Record<string, string> = {
+  fuel: "#F07A22", driver: "#3C6FD8", tolls: "#8B5CF6", wear: "#8C8F94", fixed: "#2E9E6B", margin: "#D9468F",
 };
-const label = (k: string) => `c.${k}` as Key;
 
+/** KPI tiles + where the money goes + what each order should be charged. */
 export default function CostBreakdown({ plan }: { plan: PlanResult }) {
   const { t } = useI18n();
-  const method = (p: Prediction) => {
-    const m = p.method.match(/^ml \((\d+) samples\)$/);
-    return m ? t("methodMl", { n: m[1] }) : p.method === "cost-plus" ? t("methodCostPlus") : p.method;
-  };
   const c = plan.cost;
-  const parts = { ...c.components, margin: c.margin };
-  const total = c.total || 1;
-  const totalAlloc = plan.orders.reduce((a, o) => a + o.allocated_cost, 0);
-  const totalStandalone = plan.orders.reduce((a, o) => a + o.standalone_cost, 0);
-  const totalPred = plan.orders.reduce((a, o) => a + o.prediction.price, 0);
+  const method = (p: string) => {
+    const m = p.match(/^ml \((\d+) samples\)$/);
+    if (m) return t("methodMl", { n: m[1] });
+    return p === "cost-plus" ? t("methodCostPlus") : p;
+  };
+  const parts: Record<string, number> = { ...c.components, margin: c.margin };
+  const totalAlloc = plan.orders.reduce((s, o) => s + o.allocated_cost, 0);
+  const totalStandalone = plan.orders.reduce((s, o) => s + o.standalone_cost, 0);
+  const totalPred = plan.orders.reduce((s, o) => s + o.prediction.price, 0);
+  const saved = totalStandalone - totalAlloc;
+  const countries = Object.entries(c.km_by_country).map(([k, v]) => `${k} ${num(v, 0)}`).join(" · ");
+  const util = plan.allocation.utilization;
+
+  const tiles = [
+    { hero: true, label: t("colRunCost"), value: eur(c.total), sub: t("perKm", { v: eur(c.total / Math.max(c.distance_km, 1)) }) },
+    { label: t("kpiDistance"), value: `${num(c.distance_km, 0)} km`, sub: countries },
+    { label: t("kpiDriving"), value: hours(c.drive_h), sub: t("workDays", { w: hours(c.work_h), d: c.days, days: t(c.days === 1 ? "day1" : "dayN") }) },
+    { label: t("fuel"), value: `${num(c.fuel_litres, 0)} L`, sub: t("fuelSub", { p: c.fuel_price_pump.toFixed(3), n: c.fuel_price_net.toFixed(3) }) },
+    { label: t("kpiUtil"), value: util == null ? "—" : `${Math.round(util * 100)}%`, sub: t("utilSub") },
+    { label: t("kpiSaved"), value: eur(saved, 0), sub: t("ordersCombined", { n: plan.orders.length }), good: saved > 0.5 },
+  ];
 
   return (
     <>
-      <div className="kpis">
-        <div className="kpi"><div className="label">{t("kpiDistance")}</div><div className="value">{num(c.distance_km, 0)} km</div>
-          <div className="sub">{Object.entries(c.km_by_country).map(([k, v]) => `${k} ${num(v, 0)}`).join(" · ")}</div></div>
-        <div className="kpi"><div className="label">{t("kpiDriving")}</div><div className="value">{hours(c.drive_h)}</div>
-          <div className="sub">{t("workDays", { w: hours(c.work_h), d: c.days, days: t(c.days > 1 ? "dayN" : "day1") })}</div></div>
-        <div className="kpi"><div className="label">{t("fuel")}</div><div className="value">{num(c.fuel_litres, 0)} L</div>
-          <div className="sub">{t("fuelSub", { p: c.fuel_price_pump.toFixed(3), n: c.fuel_price_net.toFixed(3) })}</div></div>
-        <div className="kpi"><div className="label">{t("kpiUtil")}</div>
-          <div className="value">{plan.allocation.utilization == null ? "—" : `${Math.round(plan.allocation.utilization * 100)}%`}</div>
-          <div className="sub">{t("utilSub")}</div></div>
-        <div className="kpi"><div className="label">{t("colRunCost")}</div><div className="value">{eur(c.total)}</div>
-          <div className="sub">{t("perKm", { v: eur(c.total / Math.max(c.distance_km, 1)) })}</div></div>
-        <div className="kpi"><div className="label">{t("kpiSaved")}</div><div className="value" style={{ color: "var(--good)" }}>
-          {eur(totalStandalone - totalAlloc, 0)}</div><div className="sub">{t("ordersCombined", { n: plan.orders.length })}</div></div>
+      <div className="tiles">
+        {tiles.map((x, i) => (
+          <div key={x.label} className={`tile card ${x.hero ? "hero" : ""}`} style={{ "--i": i } as React.CSSProperties}>
+            <span className="t-label">{x.label}</span>
+            <span className={`t-value ${x.good ? "good-ink" : ""}`}>{x.value}</span>
+            <span className="t-sub" title={x.sub}>{x.sub}</span>
+          </div>
+        ))}
       </div>
-      <div className="results-body">
-        <div style={{ display: "grid", gap: 10, alignContent: "start" }}>
-          <h3>{t("runCostBreakdown")}</h3>
-          <div className="bar">
-            {Object.entries(parts).map(([k, v]) => (
-              <span key={k} style={{ width: `${(v / total) * 100}%`, background: COLORS[k] }} title={`${t(label(k))} ${eur(v)}`} />
+
+      <section className="stack">
+        <h3 className="label">{t("runCostBreakdown")}</h3>
+        <div className="card stack">
+          <div className="stackbar" role="img" aria-label={t("runCostBreakdown")}>
+            {Object.entries(parts).filter(([, v]) => v > 0).map(([k, v], i) => (
+              <span key={k} title={`${t(`c.${k}` as Key)} ${eur(v)}`}
+                style={{ width: `${(v / c.total) * 100}%`, background: COST_COLORS[k], "--i": i } as React.CSSProperties} />
             ))}
           </div>
-          {Object.entries(parts).map(([k, v]) => (
-            <div className="legend-row" key={k}>
-              <i style={{ background: COLORS[k] }} />
-              <span>
-                {t(label(k))}
-                {k === "tolls" && Object.keys(c.tolls_by_country).length > 0 && (
-                  <span className="muted small"> ({Object.entries(c.tolls_by_country).map(([cc, x]) => `${cc} ${eur(x, 0)}`).join(", ")})</span>
-                )}
-              </span>
-              <span className="num">{eur(v)}</span>
+          <div>
+            {Object.entries(parts).map(([k, v]) => (
+              <div key={k} className="legend-row">
+                <i style={{ background: COST_COLORS[k] }} />
+                <span>
+                  {t(`c.${k}` as Key)}
+                  {k === "tolls" && Object.keys(c.tolls_by_country).length > 0 && (
+                    <span className="muted small"> · {Object.entries(c.tolls_by_country).map(([cc, x]) => `${cc} ${eur(x)}`).join(", ")}</span>
+                  )}
+                </span>
+                <span className="num">{eur(v)}</span>
+              </div>
+            ))}
+            <div className="legend-row total"><i /><span>{t("total")}</span><span className="num">{eur(c.total)}</span></div>
+            {plan.allocation.unused_capacity_cost > 0 && (
+              <div className="legend-row small muted"><i /><span>{t("unusedCap")}</span><span className="num">{eur(plan.allocation.unused_capacity_cost)}</span></div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <section className="stack">
+        <div className="spread">
+          <h3 className="label">{t("pricePerOrder")}</h3>
+          <span className="small muted">{t("quoteTotal")} <b className="num" style={{ color: "var(--ink)" }}>{eur(totalPred, 0)}</b></span>
+        </div>
+        <div className="list">
+          {plan.orders.map((o) => (
+            <div key={o.id} className="card price-card">
+              <div className="pc-top">
+                <div className="stack tight" style={{ minWidth: 0 }}>
+                  <span className="strong ellipsis">
+                    {o.reference || `#${o.id}`} {o.hazmat && <span className="pill alert">ADR</span>}
+                    <span className="muted" style={{ fontWeight: 400 }}> · {o.customer}</span>
+                  </span>
+                  <span className="small muted ellipsis" title={o.delivery}>{o.delivery}</span>
+                </div>
+                <div className="pc-price">
+                  <span className="xsmall muted">{t("colPredicted")}</span>
+                  <b>{eur(o.prediction.price, 0)}</b>
+                  {o.prediction.low != null && o.prediction.high != null && (
+                    <span className="xsmall faint num">{eur(o.prediction.low, 0)}–{eur(o.prediction.high, 0)}</span>
+                  )}
+                </div>
+              </div>
+              <div className="kv">
+                <span>{t("colAllocated")} <b>{eur(o.allocated_cost)}</b></span>
+                <span>{t("colIfSolo")} <b>{eur(o.standalone_cost)}</b></span>
+                <span>{t("colSaving")} <b className={o.savings >= 0 ? "good-ink" : "bad-ink"}>{eur(o.savings)}</b></span>
+                <span>{t("colShare")} <b>{num(o.share * 100, 1)}%</b></span>
+                <span title={t("colKmCountedTitle")}>{t("colKmCounted")} <b>{num(o.km_counted, 0)}</b>
+                  {o.km_on_board > o.km_counted + 1 && <> ({t("kmOnBoard", { km: num(o.km_on_board, 0) })})</>}
+                </span>
+                <span>{t("colEffLdm")} <b>{num(o.eff_ldm, 2)}</b></span>
+                {o.tent && <span>{o.tent}</span>}
+              </div>
+              <span className="xsmall faint">{method(o.prediction.method)}</span>
             </div>
           ))}
-          <div className="legend-row" style={{ fontWeight: 600, borderTop: "1px solid var(--line)", paddingTop: 6 }}>
-            <i /> <span>{t("total")}</span> <span className="num">{eur(c.total)}</span>
-          </div>
-          {plan.allocation.unused_capacity_cost > 0 && (
-            <div className="legend-row"><i style={{ background: "#d0d7de" }} /><span>{t("unusedCap")}</span>
-              <span className="num">{eur(plan.allocation.unused_capacity_cost)}</span></div>
-          )}
         </div>
-        <div>
-          <h3 style={{ marginBottom: 6 }}>{t("pricePerOrder")}</h3>
-          <div style={{ overflowX: "auto" }}>
-            <table className="data">
-              <thead>
-                <tr>
-                  <th>{t("order")}</th>
-                  <th className="num">{t("colEffLdm")}</th>
-                  <th className="num" title={t("colKmCountedTitle")}>{t("colKmCounted")}</th>
-                  <th className="num">{t("colShare")}</th>
-                  <th className="num">{t("colAllocated")}</th>
-                  <th className="num">{t("colIfSolo")}</th>
-                  <th className="num">{t("colSaving")}</th>
-                  <th className="num">{t("colPredicted")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {plan.orders.map((o) => (
-                  <tr key={o.id}>
-                    <td>
-                      <b>{o.reference || `#${o.id}`}</b> {o.hazmat && <span className="tag haz">ADR</span>}
-                      <div className="muted small">{o.customer} → {o.delivery}</div>
-                      {o.tent && <div className="small"><span className="tag">{o.tent}</span></div>}
-                    </td>
-                    <td className="num">{num(o.eff_ldm, 2)}</td>
-                    <td className="num">{num(o.km_counted, 0)}
-                      {o.km_on_board > o.km_counted + 1 && <div className="muted small">{t("kmOnBoard", { km: num(o.km_on_board, 0) })}</div>}</td>
-                    <td className="num">{(o.share * 100).toFixed(1)}%</td>
-                    <td className="num"><b>{eur(o.allocated_cost)}</b></td>
-                    <td className="num">{eur(o.standalone_cost)}</td>
-                    <td className="num" style={{ color: o.savings >= 0 ? "var(--good)" : "var(--bad)" }}>{eur(o.savings)}</td>
-                    <td className="num">
-                      {eur(o.prediction.price)}
-                      <div className="muted small">
-                        {o.prediction.low != null ? `${eur(o.prediction.low, 0)}–${eur(o.prediction.high, 0)} · ` : ""}
-                        {method(o.prediction)}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr>
-                  <td>{t("total")}</td><td /><td /><td className="num">100%</td>
-                  <td className="num">{eur(totalAlloc)}</td>
-                  <td className="num">{eur(totalStandalone)}</td>
-                  <td className="num">{eur(totalStandalone - totalAlloc)}</td>
-                  <td className="num">{eur(totalPred)}</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-          <p className="muted small" style={{ marginBottom: 0 }}>
-            {t("shareExplain", { m3: num(plan.truck.volume_m3 / plan.truck.ldm_capacity, 2) })}
-          </p>
-        </div>
-      </div>
+        <p className="small muted row" style={{ alignItems: "flex-start" }}>
+          <Icon name="info" size={16} />
+          <span>{t("shareExplain", { m3: num(plan.truck.volume_m3 / plan.truck.ldm_capacity, 2) })}</span>
+        </p>
+      </section>
     </>
   );
 }

@@ -1,13 +1,77 @@
 <!doctype html>
-<html lang="en">
+<html lang="lv">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#F1F1ED" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <title>Baltic Truck Planner</title>
+    <script>
+      try {
+        var t = localStorage.getItem('theme');
+        var bg = { dark: '#26282C', blue: '#EEF2F7', green: '#EDF1EC', neon: '#14121F' }[t];
+        if (bg) { document.documentElement.dataset.theme = t; document.querySelector('meta[name="theme-color"]').content = bg; }
+      } catch (e) {}
+      var solid = false;
+      try { solid = localStorage.getItem('surface') === 'solid'; } catch (e) {}
+      document.documentElement.dataset.surface = solid ? 'solid' : 'glass'; /* glass is the default */
+      try { if (localStorage.getItem('lang') === 'en') document.documentElement.lang = 'en'; } catch (e) {}
+    </script>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%2333332F'/%3E%3Cpath d='M6 11h12v10H6zM18 14h4.5l3.5 3.5V21h-8' fill='none' stroke='%23fff' stroke-width='2' stroke-linejoin='round'/%3E%3Ccircle cx='10' cy='23' r='2' fill='%23F07A22'/%3E%3Ccircle cx='22' cy='23' r='2' fill='%23F07A22'/%3E%3C/svg%3E" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <style>
+      #splash { --sp-bg: #F1F1ED; --sp-a: #33332F; --sp-b: #F07A22; --sp-glow: 35%;
+        position: fixed; inset: 0; z-index: 3000; display: flex; align-items: center; justify-content: center;
+        background: radial-gradient(60vmin 60vmin at 50% 50%, color-mix(in srgb, var(--sp-b) 12%, var(--sp-bg)), var(--sp-bg) 70%);
+        transition: opacity .4s ease; }
+      [data-theme="dark"]  #splash { --sp-bg: #26282C; --sp-a: #F2F2EF; --sp-b: #FF9A4D; --sp-glow: 60%; }
+      [data-theme="blue"]  #splash { --sp-bg: #EEF2F7; --sp-a: #16233A; --sp-b: #6F9BE6; }
+      [data-theme="green"] #splash { --sp-bg: #EDF1EC; --sp-a: #1F2D26; --sp-b: #5FB088; }
+      [data-theme="neon"]  #splash { --sp-bg: #14121F; --sp-a: #8C9BFF; --sp-b: #FF7AB8; --sp-glow: 90%; }
+      #splash.out { opacity: 0; pointer-events: none; }
+      #splash svg { width: min(46vmin, 260px); height: auto; overflow: visible; fill: none; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round;
+        animation: neon-in .5s cubic-bezier(.2, .8, .2, 1) both; }
+      #splash .a { stroke: var(--sp-a); filter: drop-shadow(0 0 3px color-mix(in srgb, var(--sp-a) var(--sp-glow), transparent)) drop-shadow(0 0 12px color-mix(in srgb, var(--sp-a) var(--sp-glow), transparent)); }
+      #splash .b { stroke: var(--sp-b); filter: drop-shadow(0 0 3px color-mix(in srgb, var(--sp-b) var(--sp-glow), transparent)) drop-shadow(0 0 12px color-mix(in srgb, var(--sp-b) var(--sp-glow), transparent)); }
+      #splash path, #splash circle { stroke-dasharray: 1; animation: neon-draw .6s cubic-bezier(.4, 0, .2, 1) .05s both; }
+      #splash .b path, #splash .b circle { animation-delay: .22s; }
+      @keyframes neon-in { from { opacity: 0; transform: scale(.86); } }
+      @keyframes neon-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+      @media (prefers-reduced-motion: reduce) { #splash svg, #splash path, #splash circle { animation: none; } }
+    </style>
   </head>
   <body>
+    <div id="splash" aria-hidden="true">
+      <svg viewBox="0 0 200 200">
+        <!-- truck = ink colour, route + destination pin = accent -->
+        <g class="a">
+          <path pathLength="1" d="M53 128H36V70h84v58" />
+          <path pathLength="1" d="M75 128h60" />
+          <path pathLength="1" d="M120 86h28l18 22v20h-9" />
+          <circle pathLength="1" cx="64" cy="130" r="11" />
+          <circle pathLength="1" cx="146" cy="130" r="11" />
+        </g>
+        <g class="b">
+          <path pathLength="1" d="M24 164h40" /><path pathLength="1" d="M80 164h40" /><path pathLength="1" d="M136 164h40" />
+          <path pathLength="1" d="M150 56c-9-10-14-17-14-24a14 14 0 0 1 28 0c0 7-5 14-14 24z" />
+          <circle pathLength="1" cx="150" cy="32" r="5" />
+        </g>
+      </svg>
+    </div>
+    <script>
+      // Fades out once it has shown for 1 s (0.5 s with reduced motion) AND the app has drawn; never stuck past 8 s.
+      (function () {
+        var el = document.getElementById('splash'), root, t0 = Date.now();
+        var min = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches ? 500 : 1000;
+        function done() { el.className = 'out'; setTimeout(function () { el.remove(); }, 450); }
+        function check() { root = root || document.getElementById('root');
+          if (root && root.firstChild && Date.now() - t0 >= min) done(); else setTimeout(check, 60); }
+        check();
+        setTimeout(function () { if (el.isConnected && el.className !== 'out') done(); }, 8000);
+      })();
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
