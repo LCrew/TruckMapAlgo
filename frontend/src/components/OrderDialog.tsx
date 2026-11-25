@@ -71,7 +71,7 @@ export default function OrderDialog({ draft, setDraft, onClose, onSaved, onPick 
       actions={<>
         {error && <span className="small bad-ink grow">{error}</span>}
         <button type="button" className="btn" onClick={onClose}>{t("cancel")}</button>
-        <button type="submit" form="order-form" className="btn primary" disabled={busy}>
+        <button type="submit" form="order-form" className={`btn primary ${busy ? "busy" : ""}`} disabled={busy}>
           {busy && <Spinner />}{isNew ? t("addOrderBtn") : t("saveChanges")}
         </button>
       </>}>

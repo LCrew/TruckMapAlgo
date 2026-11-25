@@ -353,7 +353,7 @@ export default function Planner({ settings, goTo }: { settings: Settings | null;
                 </div>
               )}
               {error && <div className="alert error"><Icon name="alert" size={18} /><span>{error}</span></div>}
-              <button className="btn primary big block" onClick={planRoute} disabled={!selected.size || !!busy || planCurrent}>
+              <button className={`btn primary big block ${busy === "compare" || busy === "plan" ? "busy" : ""}`} onClick={planRoute} disabled={!selected.size || !!busy || planCurrent}>
                 {busy === "compare" || busy === "plan" ? <Spinner /> : <Icon name={planCurrent ? "check" : "route"} size={20} />}
                 {planBtnLabel}
               </button>

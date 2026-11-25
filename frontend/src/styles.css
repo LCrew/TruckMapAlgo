@@ -190,7 +190,7 @@ a { color: inherit; text-underline-offset: 2px; }
 /* ───────────── 5. Buttons ───────────── */
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 20px;
   border-radius: 22px; border: 1px solid var(--line); background: var(--card); color: var(--ink); font-weight: 500; font-size: 15px;
-  cursor: pointer; white-space: nowrap; text-decoration: none; transition: border-color .15s ease, background .15s ease, opacity .15s ease; }
+  cursor: pointer; white-space: nowrap; text-decoration: none; transition: border-color .15s ease, background .15s ease; }
 @media (hover: hover) { .btn:hover:not(:disabled) { border-color: var(--ink); } }
 .btn.primary { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
 @media (hover: hover) { .btn.primary:hover:not(:disabled) { background: var(--ink-hover); border-color: var(--ink-hover); } }
@@ -203,7 +203,9 @@ a { color: inherit; text-underline-offset: 2px; }
 .btn.block { width: 100%; }
 .btn.big { min-height: 52px; border-radius: 26px; font-size: 16px; }
 .btn:disabled, .btn[aria-disabled="true"] { opacity: .5; cursor: default; }
-.btn.busy:disabled { opacity: 1; }
+/* a working button stays solid (the spinner says it is busy); fading it while its label changes left
+   ghost text behind in Safari */
+.btn.busy:disabled { opacity: 1; cursor: progress; }
 .btn svg { flex: none; }
 :root[data-surface="glass"] .btn:not(.primary, .ghost, .armed) { background: var(--glass); border-color: var(--glass-edge); box-shadow: var(--glass-shine); }
 @media (hover: hover) { :root[data-surface="glass"] .btn:not(.primary, .ghost, .armed):hover:not(:disabled) { background: var(--glass-hover); border-color: var(--ink); } }

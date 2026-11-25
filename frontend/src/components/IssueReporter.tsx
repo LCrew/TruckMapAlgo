@@ -69,7 +69,7 @@ export default function IssueReporter({ page, onClose }: { page: string; onClose
           <Icon name="external" size={18} />{t("openOnGithub")}
         </a>
       ) : (
-        <button className="btn primary" disabled={!valid || busy} onClick={submit}>
+        <button className={`btn primary ${busy ? "busy" : ""}`} disabled={!valid || busy} onClick={submit}>
           {busy ? <Spinner /> : <Icon name="flag" size={18} />}{busy ? t("sending") : t("send")}
         </button>
       )}

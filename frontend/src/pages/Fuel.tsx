@@ -61,7 +61,7 @@ export default function Fuel() {
     <div className="page">
       <div className="page-head">
         <h1 className="page-title">{t("tab.Fuel")}<span>{t("latvianFuelPrices")}</span></h1>
-        <button className="btn" onClick={refresh} disabled={busy}>
+        <button className={`btn ${busy ? "busy" : ""}`} onClick={refresh} disabled={busy}>
           <Icon name="refresh" size={18} className={busy ? "spin" : ""} />{busy ? t("scraping") : t("refreshNow")}
         </button>
       </div>

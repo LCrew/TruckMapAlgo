@@ -200,7 +200,7 @@ function TruckCard({ unit, index, onSaved, onRemoved, onDuplicate }: {
             </div>
             <div className="row">
               {!isNew && dirty && <button className="btn small" onClick={() => setD(unit)}>{t("discard")}</button>}
-              <button className="btn primary" onClick={save} disabled={busy || !dirty}>
+              <button className={`btn primary ${busy ? "busy" : ""}`} onClick={save} disabled={busy || !dirty}>
                 {busy ? <Spinner /> : <Icon name="save" size={18} />}{t("saveUnit")}
               </button>
             </div>

@@ -45,12 +45,12 @@ export default function PlanResultPane({ plan, savedRunId, fleet, busy, stale, o
         ) : stale ? (
           <div className="row">
             <span className="small muted grow">{t("selectionChanged")}</span>
-            <button className="btn primary small" onClick={onReplan} disabled={!!busy}>{busy === "plan" && <Spinner />}{t("updatePlan")}</button>
+            <button className={`btn primary small ${busy === "plan" ? "busy" : ""}`} onClick={onReplan} disabled={!!busy}>{busy === "plan" && <Spinner />}{t("updatePlan")}</button>
           </div>
         ) : (
           <div className="row">
             <span className="small muted grow">{t("saveRunHint")}</span>
-            <button className="btn primary" onClick={onSave} disabled={!!busy}>
+            <button className={`btn primary ${busy === "save" ? "busy" : ""}`} onClick={onSave} disabled={!!busy}>
               {busy === "save" ? <Spinner /> : <Icon name="save" size={18} />}{t("saveRun")}
             </button>
           </div>

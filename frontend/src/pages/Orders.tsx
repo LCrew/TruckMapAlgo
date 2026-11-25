@@ -258,7 +258,7 @@ export default function Orders({ goTo }: { goTo: (tab: string) => void }) {
               )}
               <p className="small muted" style={{ margin: 0 }}>{t("modelExplain", { r: model.required })}</p>
               <div className="stack tight">
-                <button className="btn primary block" onClick={train} disabled={training || model.samples_available < model.required}>
+                <button className={`btn primary block ${training ? "busy" : ""}`} onClick={train} disabled={training || model.samples_available < model.required}>
                   {training ? <Spinner /> : <Icon name="model" size={18} />}{t("trainModel")}
                 </button>
                 <FileButton className="btn block" accept=".csv,text/csv" onFile={importHistory}><Icon name="upload" size={18} />{t("importHistory")}</FileButton>
