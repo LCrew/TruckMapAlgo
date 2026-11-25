@@ -1,5 +1,6 @@
 import { eur, FleetOption, hours, num, PlanResult } from "../lib/api";
 import { useI18n } from "../lib/i18n";
+import { visitNumbers } from "../lib/route";
 import CostBreakdown from "./CostBreakdown";
 import Icon from "./Icon";
 import LoadingPlanView from "./LoadingPlanView";
@@ -15,10 +16,14 @@ interface Props {
   onClose: () => void;
   onUseTruck: (id: number) => void;
   onReplan: () => void;
+  /** leg highlighted on the map, and a callback when a leg row is hovered here */
+  hoverLeg?: number | null;
+  onHoverLeg?: (i: number | null) => void;
 }
 
-export default function PlanResultPane({ plan, savedRunId, fleet, busy, stale, onSave, onClose, onUseTruck, onReplan }: Props) {
+export default function PlanResultPane({ plan, savedRunId, fleet, busy, stale, onSave, onClose, onUseTruck, onReplan, hoverLeg, onHoverLeg }: Props) {
   const { t } = useI18n();
+  const visits = visitNumbers(plan.stops);
   const deliveries = plan.stops.filter((s) => s.kind === "delivery").length;
   const okFleet = fleet?.filter((f) => f.ok) ?? [];
 
@@ -117,12 +122,14 @@ export default function PlanResultPane({ plan, savedRunId, fleet, busy, stale, o
             <h3 className="label">{t("itinerary", { stops: plan.stops.length, legs: plan.legs.length })}</h3>
             <span className="fold-ic"><Icon name="chevron" size={18} /></span>
           </summary>
-          <div className="timeline">
+          <div className="timeline" onMouseLeave={() => onHoverLeg?.(null)}>
             {plan.stops.map((s, i) => {
-              const leg = plan.legs.find((l) => l.from_seq === i);
+              const li = plan.legs.findIndex((l) => l.from_seq === i);
+              const leg = li >= 0 ? plan.legs[li] : undefined;
               return (
-                <div key={i} className="tl-stop">
-                  <span className={`tl-dot ${s.kind}`}>{s.kind === "depot" ? <Icon name="home" size={14} /> : i}</span>
+                <div key={i} className={`tl-stop ${li >= 0 && li === hoverLeg ? "hot" : ""}`}
+                  onMouseEnter={leg ? () => onHoverLeg?.(li) : undefined} onMouseLeave={leg ? () => onHoverLeg?.(null) : undefined}>
+                  <span className={`tl-dot ${s.kind}`}>{s.kind === "depot" || visits[i] === 0 ? <Icon name="home" size={14} /> : visits[i]}</span>
                   <div className="tl-body">
                     <span className="small">
                       <b>{t(s.kind === "pickup" ? "kindLoad" : s.kind === "delivery" ? "kindUnload" : "kindDepot")}</b>
@@ -134,7 +141,7 @@ export default function PlanResultPane({ plan, savedRunId, fleet, busy, stale, o
                     )}
                     {leg && (
                       <span className="tl-leg">
-                        ↓ {num(leg.distance_km)} km · {hours(leg.duration_h)} · {num(leg.gross_t, 1)} t
+                        <span className="tl-legname">{t("legN", { n: li + 1 })}</span>↓ {num(leg.distance_km)} km · {hours(leg.duration_h)} · {num(leg.gross_t, 1)} t
                         {Object.keys(leg.km_by_country).length > 0 && ` · ${Object.entries(leg.km_by_country).map(([k, v]) => `${k} ${num(v, 0)}`).join(" ")}`}
                         {leg.restriction_detour_km != null && leg.restriction_detour_km > 1 && ` · ${t("forRestrictions", { km: num(leg.restriction_detour_km) })}`}
                       </span>

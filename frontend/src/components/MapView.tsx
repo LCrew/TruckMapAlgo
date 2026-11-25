@@ -1,16 +1,23 @@
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { MapContainer, Marker, Polyline, Popup, TileLayer, Tooltip, useMap, useMapEvents } from "react-leaflet";
+import { MapContainer, Marker, Popup, TileLayer, Tooltip, useMap, useMapEvents } from "react-leaflet";
 import { api, hours, num, Order, PlanResult, Restriction, Truck } from "../lib/api";
 import { translateRestriction, useI18n } from "../lib/i18n";
+import { legOffsets, visitNumbers } from "../lib/route";
 import Icon from "./Icon";
+import RouteLayer, { RouteLeg } from "./RouteLayer";
 
 const BALTIC_BOUNDS: L.LatLngBoundsExpression = [[53.8, 20.8], [59.8, 28.3]];
 
 const DEPOT_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11 12 4l9 7M5 10v10h14V10M10 20v-6h4v6"/></svg>';
 const depotIcon = L.divIcon({ className: "depot-icon", html: DEPOT_SVG, iconSize: [30, 30] });
-const stopIcon = (n: number, kind: string) => L.divIcon({ className: `stop-icon ${kind}`, html: String(n), iconSize: [28, 28] });
+// one marker per place; a place visited twice shows both visit numbers ("2·4")
+const stopIcon = (nums: number[], kind: string) => {
+  const w = nums.length > 1 ? 18 + nums.join("·").length * 7 : 28;
+  return L.divIcon({ className: `stop-icon ${kind}`, html: nums.join("·"), iconSize: [w, 28] });
+};
+const esc = (v: string) => v.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 const orderIcon = (on: boolean, hot: boolean) =>
   L.divIcon({ className: "ord-pin", html: `<span class="ord-dot ${on ? "on" : ""} ${hot ? "hot" : ""}"></span>`, iconSize: [18, 18] });
 const restrIcon = (r: Restriction) => {
@@ -19,7 +26,7 @@ const restrIcon = (r: Restriction) => {
 };
 
 // light → dark blue by how loaded the truck is on that leg (matches .legend-grad)
-const STOPS = [[168, 198, 255], [60, 111, 216], [11, 47, 107]];
+const STOPS = [[126, 166, 240], [60, 111, 216], [11, 47, 107]];
 function legColor(payload: number, max: number) {
   const f = Math.max(0, Math.min(1, payload / Math.max(max, 0.1))) * 2;
   const i = Math.min(1, Math.floor(f));
@@ -44,10 +51,12 @@ function paneInsets(map: L.Map) {
     if (r.left + r.width / 2 < box.left + box.width / 2) left = Math.max(left, r.right - box.left + 24);
     else right = Math.max(right, box.right - r.left + 24);
   });
+  // the top bar only matters where it actually covers the map (on phones the map scrolls away under it)
   const bar = document.querySelector(".topbar")?.getBoundingClientRect();
-  if (bar && bar.bottom > box.top) top = bar.bottom - box.top + 24;
-  // only ignore the panes when the gap between them is too narrow to show anything
+  if (bar && bar.bottom > box.top && bar.top < box.bottom) top = bar.bottom - box.top + 24;
+  // only ignore the panes / bar when the gap left over is too small to show anything
   if (box.width - left - right < 220) left = right = 24;
+  if (box.height - top - 24 < 160) top = 24;
   return { paddingTopLeft: L.point(left, top), paddingBottomRight: L.point(right, 24) };
 }
 
@@ -158,9 +167,12 @@ interface Props {
   picking?: boolean;
   onPick?: (lat: number, lon: number) => void;
   onToggleOrder?: (id: number) => void;
+  /** leg to emphasise (hovered in the itinerary) and a callback when a leg is hovered on the map */
+  highlightLeg?: number | null;
+  onHoverLeg?: (i: number | null) => void;
 }
 
-export default function MapView({ depot, orders, selected, hoverId, plan, truck, picking, onPick, onToggleOrder }: Props) {
+export default function MapView({ depot, orders, selected, hoverId, plan, truck, picking, onPick, onToggleOrder, highlightLeg, onHoverLeg }: Props) {
   const { t, lang } = useI18n();
   const [showRestr, setShowRestr] = useState(false);
   const [restrMsg, setRestrMsg] = useState("");
@@ -175,23 +187,43 @@ export default function MapView({ depot, orders, selected, hoverId, plan, truck,
 
   const located = orders.filter((o) => o.delivery_lat != null);
 
-  // number stops, merging stops at the same point
+  // number stops by visit (consecutive stops at one place are one visit); one marker per place
   const stopMarkers = useMemo(() => {
     if (!plan) return [];
-    const groups: { lat: number; lon: number; idx: number[]; kinds: Set<string>; labels: string[] }[] = [];
+    const visits = visitNumbers(plan.stops);
+    const groups: { lat: number; lon: number; nums: number[]; kinds: Set<string>; labels: string[] }[] = [];
     plan.stops.forEach((s, i) => {
-      if (s.kind === "depot") return;
+      if (s.kind === "depot" || visits[i] === 0) return; // the depot has its own marker; 0 = loading before departure
       const g = groups.find((x) => Math.abs(x.lat - s.lat) < 1e-5 && Math.abs(x.lon - s.lon) < 1e-5);
-      const label = `${i}. ${t(s.kind === "pickup" ? "stopLoad" : "stopUnload")} ${s.reference || `#${s.order_id}`} — ${s.label}`;
+      const label = `${visits[i]}. ${t(s.kind === "pickup" ? "stopLoad" : "stopUnload")} ${s.reference || `#${s.order_id}`} — ${s.label}`;
       if (g) {
-        g.idx.push(i);
+        if (!g.nums.includes(visits[i])) g.nums.push(visits[i]);
         g.kinds.add(s.kind);
         g.labels.push(label);
-      } else groups.push({ lat: s.lat, lon: s.lon, idx: [i], kinds: new Set([s.kind]), labels: [label] });
+      } else groups.push({ lat: s.lat, lon: s.lon, nums: [visits[i]], kinds: new Set([s.kind]), labels: [label] });
     });
     return groups;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plan, lang]);
+
+  const routeLegs = useMemo<RouteLeg[]>(() => {
+    if (!plan) return [];
+    const visits = visitNumbers(plan.stops);
+    const offsets = legOffsets(plan.legs.map((l) => l.shape));
+    const place = (seq: number) => (visits[seq] === 0 || plan.stops[seq]?.kind === "depot" ? t("depot") : String(visits[seq]));
+    return plan.legs.map((l, i) => ({
+      shape: l.shape,
+      color: legColor(l.payload_t, maxPayload),
+      offset: offsets[i],
+      tooltip:
+        `<b>${esc(t("legN", { n: i + 1 }))}</b> · ${esc(place(l.from_seq))} → ${esc(place(l.to_seq))}<br>` +
+        `${num(l.distance_km)} km · ${esc(hours(l.duration_h))}<br>` +
+        esc(t("onBoard", { t: num(l.payload_t, 2), ldm: num(l.ldm_on_board, 2), g: num(l.gross_t, 1) })) + "<br>" +
+        esc(t("consumption", { c: num(l.consumption_l100) })) +
+        (l.restriction_detour_km != null && l.restriction_detour_km > 1 ? `<br><b>${esc(t("detourTooltip", { km: num(l.restriction_detour_km) }))}</b>` : ""),
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plan, maxPayload, lang]);
 
   // what to fit the view to: the planned route, otherwise depot + open orders (once they load)
   const { points, fitKey } = useMemo(() => {
@@ -240,27 +272,9 @@ export default function MapView({ depot, orders, selected, hoverId, plan, truck,
               </Marker>
             );
           })}
-        {plan?.legs.map((l, i) => (
-          <Polyline key={`c${i}`} positions={l.shape} interactive={false}
-            pathOptions={{ className: "leg-casing", color: "#fff", weight: 9, opacity: 1, lineCap: "round", lineJoin: "round" }} />
-        ))}
-        {plan?.legs.map((l, i) => (
-          <Polyline key={i} positions={l.shape}
-            pathOptions={{ color: legColor(l.payload_t, maxPayload), weight: 5, opacity: 1, lineCap: "round", lineJoin: "round" }}>
-            <Tooltip sticky>
-              <b>{t("legN", { n: i + 1 })}</b>: {num(l.distance_km)} km · {hours(l.duration_h)}
-              <br />
-              {t("onBoard", { t: num(l.payload_t, 2), ldm: num(l.ldm_on_board, 2), g: num(l.gross_t, 1) })}
-              <br />
-              {t("consumption", { c: num(l.consumption_l100) })}
-              {l.restriction_detour_km != null && l.restriction_detour_km > 1 && (
-                <><br /><b>{t("detourTooltip", { km: num(l.restriction_detour_km) })}</b></>
-              )}
-            </Tooltip>
-          </Polyline>
-        ))}
+        {plan && <RouteLayer legs={routeLegs} highlight={highlightLeg} onHover={onHoverLeg} />}
         {stopMarkers.map((g, i) => (
-          <Marker key={i} position={[g.lat, g.lon]} icon={stopIcon(g.idx[0], g.kinds.size > 1 ? "" : [...g.kinds][0])}>
+          <Marker key={i} position={[g.lat, g.lon]} icon={stopIcon(g.nums, g.kinds.size > 1 ? "" : [...g.kinds][0])}>
             <Popup>{g.labels.map((l) => <div key={l}>{l}</div>)}</Popup>
           </Marker>
         ))}

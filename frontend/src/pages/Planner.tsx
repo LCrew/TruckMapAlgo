@@ -24,7 +24,13 @@ export default function Planner({ settings, goTo }: { settings: Settings | null;
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [query, setQuery] = useState("");
   const [hoverId, setHoverId] = useState<number | null>(null);
+  const [hoverLeg, setHoverLeg] = useState<number | null>(null);
   const [plan, setPlan] = useState<PlanResult | null>(null);
+  // phones: the result opens as a sheet under the map, so bring the map (with the route) into view
+  const hasPlan = plan != null;
+  useEffect(() => {
+    if (hasPlan && window.matchMedia("(max-width: 800px)").matches) window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [hasPlan]);
   const [planIds, setPlanIds] = useState("");
   const [fleet, setFleet] = useState<FleetOption[] | null>(null);
   const [savedRunId, setSavedRunId] = useState<number | null>(null);
@@ -212,7 +218,7 @@ export default function Planner({ settings, goTo }: { settings: Settings | null;
 
   return (
     <div className="planner">
-      <MapView depot={depot} orders={orders} selected={selected} hoverId={hoverId} plan={plan} truck={truck ?? active[0] ?? null}
+      <MapView depot={depot} orders={orders} selected={selected} hoverId={hoverId} plan={plan} highlightLeg={hoverLeg} onHoverLeg={setHoverLeg} truck={truck ?? active[0] ?? null}
         picking={!!picking} onPick={onMapPick} onToggleOrder={toggle} />
 
       {picking && (
@@ -383,7 +389,7 @@ export default function Planner({ settings, goTo }: { settings: Settings | null;
       </section>
 
       {plan && (
-        <PlanResultPane plan={plan} savedRunId={savedRunId} fleet={fleet} busy={busy} stale={stale}
+        <PlanResultPane plan={plan} hoverLeg={hoverLeg} onHoverLeg={setHoverLeg} savedRunId={savedRunId} fleet={fleet} busy={busy} stale={stale}
           onSave={saveRun} onClose={closePlan} onUseTruck={pickTruck} onReplan={planRoute} />
       )}
 

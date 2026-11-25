@@ -504,14 +504,14 @@ main.vt-main { view-transition-name: main; }
   background: var(--card); box-shadow: 0 6px 20px rgba(30,30,28,.14); }
 :root[data-surface="glass"] .map-legend { background: var(--pop); -webkit-backdrop-filter: saturate(1.8) blur(20px); backdrop-filter: saturate(1.8) blur(20px);
   box-shadow: var(--glass-shine); border: 1px solid var(--glass-edge); }
-.legend-grad { height: 6px; border-radius: 3px; background: linear-gradient(90deg, #A8C6FF, #3C6FD8, #0B2F6B); }
+.legend-grad { height: 6px; border-radius: 3px; background: linear-gradient(90deg, #7EA6F0, #3C6FD8, #0B2F6B); }
 .zoom-stack { display: grid; gap: 8px; }
 
 /* map markers */
 .depot-icon { background: var(--ink); color: var(--on-ink); border: 2px solid #fff; border-radius: 12px; width: 30px !important; height: 30px !important;
   display: grid !important; place-items: center; box-shadow: 0 2px 8px rgba(0,0,0,.35); }
 .depot-icon svg { width: 16px; height: 16px; }
-.stop-icon { background: var(--ink); color: var(--on-ink); border: 2px solid #fff; border-radius: 50%; width: 28px !important; height: 28px !important;
+.stop-icon { background: var(--ink); color: var(--on-ink); border: 2px solid #fff; border-radius: 14px; box-sizing: border-box; padding: 0 6px; white-space: nowrap;
   display: grid !important; place-items: center; font: 600 12px/1 'Geist Variable', 'Geist', system-ui, sans-serif; box-shadow: 0 2px 8px rgba(0,0,0,.35); }
 .stop-icon.pickup { background: var(--pickup); color: #fff; }
 .stop-icon.delivery { background: var(--delivery); color: #fff; }
@@ -590,9 +590,10 @@ main.vt-main { view-transition-name: main; }
   .float-pane { position: static; border-radius: 28px; overflow: visible; }
   .plan-pane { width: auto; }
   .fp-body { overflow: visible; }
-  .result-pane { position: fixed; inset: 0; z-index: 1002; width: auto; border-radius: 0; animation: push-in .5s var(--ease) both;
-    padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom);
-    background: var(--bg) !important; }
+  /* bottom sheet under the map, so the planned route stays visible above it */
+  .result-pane { position: fixed; inset: calc(var(--top-h) + env(safe-area-inset-top) + 24px + 42dvh) 0 0 0; z-index: 1002; width: auto;
+    border-radius: 28px 28px 0 0; animation: sheet-up .45s var(--ease) both; padding-bottom: env(safe-area-inset-bottom);
+    background: var(--bg) !important; box-shadow: 0 -8px 30px rgba(0,0,0,.18); }
   :root[data-surface="glass"] .result-pane { background: linear-gradient(to bottom, var(--bg), transparent 26vh), var(--glow-bg), var(--bg) !important; }
   .result-pane .fp-body { overflow-y: auto; }
   .map-tools.left { left: 12px; bottom: 12px; }
@@ -729,7 +730,16 @@ html[data-vt="tab"]::view-transition-group(*) { animation-duration: 180ms; }
 .savebar button:disabled { opacity: .5; cursor: default; }
 :root[data-surface="glass"] .savebar { background: color-mix(in srgb, var(--ink) 80%, transparent); -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); }
 
-.leaflet-interactive.leg-casing { stroke: var(--card); }
+path.leg-casing { stroke: var(--card); }
+/* direction of travel along the route */
+.route-arrow { background: none; border: 0; pointer-events: none; transition: opacity .15s; }
+.route-arrow span { display: grid; place-items: center; width: 16px; height: 16px; box-sizing: border-box; border-radius: 50%;
+  border: 1.5px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.35); }
+.route-arrow svg { width: 10px; height: 10px; fill: none; stroke: #fff; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.route-arrow.dim { opacity: .25; }
+.tl-stop.hot .tl-leg { color: var(--ink); }
+.tl-stop.hot .tl-legname { background: var(--ink); color: var(--on-ink); }
+.tl-legname { display: inline-block; padding: 0 6px; margin-right: 4px; border-radius: 6px; background: var(--pillbg); color: var(--ink); font-weight: 600; transition: background .15s, color .15s; }
 .ord-dot.hot { transform: scale(1.45); box-shadow: 0 0 0 4px color-mix(in srgb, var(--delivery) 35%, transparent), 0 1px 4px rgba(0,0,0,.45);  }
 .map-wrap.picking .leaflet-container { cursor: crosshair; }
 .map-wrap.picking .ord-dot { opacity: .45; }
